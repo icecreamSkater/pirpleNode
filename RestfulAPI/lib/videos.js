@@ -3,7 +3,9 @@
  */
 
  // Array of videos to recommend
-var ja_videos = [
+var ja_videos = {};
+
+ja_videos.videos = [
 	'https://www.youtube.com/watch?v=bmtIizXdh88',
 	'https://www.youtube.com/watch?v=WBQn0nD27nc',
 	'https://www.youtube.com/watch?v=t6rHHnABoT8',
@@ -14,11 +16,11 @@ var ja_videos = [
 	'https://www.youtube.com/watch?v=eRkgK4jfi6M'
 ];
 
-function getVideo() {
-	var numSelections = ja_videos.length;
+ja_videos.getVideo = function() {
+	var numSelections = ja_videos.videos.length;
 	var selected = Math.floor((Math.random() * numSelections) + 1);
-	return ja_videos[selected];
+	return ja_videos.videos[selected];
 }
 
  // Export the module
-module.exports = getVideo();
+module.exports = ja_videos;

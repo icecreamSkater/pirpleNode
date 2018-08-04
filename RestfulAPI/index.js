@@ -15,9 +15,10 @@ var http = require('http');
 var https = require('https');
 var url = require('url');
 var StringDecoder = require('string_decoder').StringDecoder;
-var config = require('./config');
-var jsutils = require('./utils');
-var handlers = require('./serverSupport').handlers;
+var config = require('./lib/config');
+var jsutils = require('./lib/utils');
+var handlers = require('./lib/handlers');
+var helpers = require('./lib/helpers');
 var fs = require('fs');
 
 // Instantiating the http server
@@ -93,7 +94,7 @@ var unifiedServer = function(req, res) {
 			'queryStringObject' : queryStringObject,
 			'method' : method,
 			'headers' : headers,
-			'payload' : buffer
+			'payload' : helpers.parseJsonToObject(buffer)
 		};
 
 		chosenHandler(data, function(statusCode, payload){
@@ -125,5 +126,6 @@ var unifiedServer = function(req, res) {
 //    unknown requests should go to the default handler
 var router = {
 	'ping'  : handlers.ping,
-	'hello' : handlers.hello
+	'hello' : handlers.hello,
+	'users' : handlers.users
 };

@@ -6,6 +6,7 @@ Library for storing and editing data
 
 var fs = require('fs');
 var path = require('path');
+var helpers = require('./helpers');
 
 // Container for this module
 // the .data directory is like a poor man's database
@@ -45,7 +46,13 @@ lib.create = function(dir, file, data, callback){
 
 lib.read = function(dir, file, callback) {
 	fs.readFile(lib.baseDir + '/' + dir + '/' + file + '.json', 'utf8', function(err, data){
-		callback(err, data);
+		if (err || !data) {
+			callback(err, data);
+		} else {
+			var parsedData = helpers.parseJsonToObject(data);
+			callback(false, parsedData);			
+		}
+			
 	});
 };
 

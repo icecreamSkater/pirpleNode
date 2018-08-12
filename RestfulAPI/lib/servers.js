@@ -82,10 +82,11 @@ servers.unifiedServer = function(req, res) {
 //    for instance:  /users will go to the users handler
 //    unknown requests should go to the default handler
 var router = {
-	'ping'  : handlers.ping,
-	'hello' : handlers.hello,
-	'users' : handlers.users,
-	'tokens' : handlers.tokens
+	'ping'   : handlers.ping,
+	'hello'  : handlers.hello,
+	'users'  : handlers.users,
+	'tokens' : handlers.tokens,
+	'checks' : handlers.checks
 };
 
  // Export the module

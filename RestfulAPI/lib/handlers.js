@@ -5,12 +5,14 @@
  var _data = require('./data');
  var helpers = require('./helpers');
  var jsutils = require('./utils');
+ var config = require('./config');
 
 // Containers for token handler private objects and functions
 handlers = {};
 handlers._users = {};
 handlers._tokens = {};
 handlers._common = {};
+handlers._checks = {};
 
 // ping handler
 handlers.ping = function(data, callback) {
@@ -41,6 +43,17 @@ handlers.tokens = function(data, callback) {
 	var acceptableMethods = ['post','get','put','delete']; // CRUD only, no Head or patch
 	if (acceptableMethods.indexOf(data.method) > -1) {
 		handlers._tokens[data.method](data, callback);
+	} else {
+		callback(405); // method not allowed
+	}
+};
+
+// checks handler
+handlers.checks = function(data, callback) {
+	// acceptable methods
+	var acceptableMethods = ['post','get','put','delete']; // CRUD only, no Head or patch
+	if (acceptableMethods.indexOf(data.method) > -1) {
+		handlers._checks[data.method](data, callback);
 	} else {
 		callback(405); // method not allowed
 	}
@@ -198,7 +211,6 @@ handlers._users.put = function(data, callback){
 
 	//Users - delete
 	//Required data : phone
-	// @TODO Cleanup (delete) and other data files associated with this user
 handlers._users.delete = function(data, callback){
 	// Check that the phone number is valid
 	var phone = jsutils.setString(data.queryStringObject.phone, 10);
@@ -220,11 +232,32 @@ handlers._users.delete = function(data, callback){
 				return;
 			}
 			_data.delete('users', phone, function(err){
-				if (!err) {
-					callback(200);
-				} else {
+				if (err) {
 					callback(500, {'Error' : 'Could not delete the specified user'});
-				}				
+					return;					
+				}
+				var userChecks = jsutils.setNonEmptyArray(data.checks, null);
+				var checksToDelete = userChecks.length;
+				if (userChecks && userChecks.length > 0) {
+					var numChecksDeleted = 0;
+					var deletionErrors = false;
+					userChecks.forEach(function(checkId){
+						_data.delete('checks', checkId, function(err){
+							numChecksDeleted++;
+							if (err) {
+								deletionErrors = true;
+							}
+							if (numChecksDeleted == checksToDelete) {
+								if (!deletionErrors) {
+									callback(200);
+								} else {
+									callback(500, {'ERROR' : 'Errors deleting Users Checks'});
+								}
+							}
+						});
+					});
+				}
+				callback(200);			
 			});
 		});
 	});
@@ -279,15 +312,14 @@ handlers._tokens.post = function(data, callback){
 			}
 		});					
 	});
-}
+};
 
 	//Tokens - get
 	//Required data : id
 	// No optional data
 handlers._tokens.get = function(data, callback){
 	// Check that the id is valid
-	var id = typeof(data.queryStringObject.id) == 'string' && data.queryStringObject.id.trim().length == 20 ?
-		data.queryStringObject.id.trim() : false;
+	var id = jsutils.setString(data.queryStringObject.id, 20);
 	if (!id) {
 		callback(400, {'Error' : 'Missing required field'});
 		return;
@@ -299,16 +331,14 @@ handlers._tokens.get = function(data, callback){
 			callback(404, {'Error' : 'Read error when accessing token'});
 		}
 	});
-}
+};
 
 	//Tokens - put
 	//Required data : id, extend
-	// @TODO only let authenticated used access their objects, don't let them access anyone else's
 	// @TODO make extension time configurable
 handlers._tokens.put = function(data, callback){
 	// Check that the id is valid
-	var tokenId = typeof(data.payload.id) == 'string' && data.payload.id.trim().length == 20 ?
-		data.payload.id.trim() : false;
+	var tokenId = jsutils.setString(data.payload.id, 20);
 	var extend = typeof(data.payload.extend) == 'boolean' ? data.payload.extend : false;
 	if (!tokenId) {
 		callback(400, {'Error' : 'Id is not valid'});
@@ -339,16 +369,13 @@ handlers._tokens.put = function(data, callback){
 			}
 		});	
 	});
-}
+};
 
 	//Tokens - delete (deleting a token is the same as logging out)
 	//Required data : phone
-	// @TODO only let authenticated used access their objects, don't let them access anyone else's
-	// @TODO Cleanup (delete) and other data files associated with this user
 handlers._tokens.delete = function(data, callback){
 	// Check that the token Id is valid
-	var tokenId = typeof(data.queryStringObject.id.trim()) == 'string' && data.queryStringObject.id.trim().length == 20 ?
-		data.queryStringObject.id.trim() : false;
+	var tokenId = jsutils.setString(data.queryStringObject.id, 20);
 	if (!tokenId) {
 		callback(400, {'Error' : 'Invalid Token Id'});
 		return;
@@ -366,7 +393,214 @@ handlers._tokens.delete = function(data, callback){
 			}				
 		});
 	});
-}
+};
+
+	//Checks - get
+	//Required data : id
+	// No optional data
+handlers._checks.get = function(data, callback){
+	// Check that the id is valid
+	var id = jsutils.setString(data.queryStringObject.id, 20);
+	if (!id) {
+		callback(400, {'Error' : 'Missing required field'});
+		return;
+	}
+	// Lookup the check
+	_data.read('checks', id, function(err, checkData){
+		if (err || !checkData) {
+			callback(404);
+			return;
+		}
+		// Get the token from the headers
+		var tokenId = jsutils.setString(data.headers.token, null);
+		handlers._common.verifyToken(tokenId, checkData.userPhone, function(tokenIsValid){
+			if (!tokenIsValid) {
+				callback(403);
+				return;
+			}
+			callback(200, checkData);
+		});
+	});
+
+
+
+};
+
+	// Checks - post
+	// Required data : protocol, url, method, successCodes, timeoutSeconds
+	// No optional data
+handlers._checks.post = function(data, callback){
+	var protocol = jsutils.setString(data.payload.protocol, null);
+	var url = jsutils.setString(data.payload.url, null);
+	var method = jsutils.setString(data.payload.method, null);
+	var successCodes = jsutils.setNonEmptyArray(data.payload.successCodes);
+	var timeoutSeconds = jsutils.setWholeNumber(data.payload.timeoutSeconds, 0, 6);
+	var allowedProtocols = ['https', 'http'];
+	var allowedMethods = ['post', 'get', 'put', 'delete'];
+	if (!url  
+		|| !protocol || !jsutils.arrayContains(allowedProtocols, protocol) 
+		|| !method || !jsutils.arrayContains(allowedMethods, method)
+		|| !successCodes
+		|| !timeoutSeconds) {
+		callback(400, {'ERROR' : 'Invalid or missing inputs'});
+		return;
+	}
+
+	// Disallow anonymous users
+	var token = jsutils.setString(data.headers.token, null);
+	_data.read('tokens', token, function(err, tokenData){
+		if (err || !tokenData) {
+			callback(403);
+			return;
+		}
+		var userPhone = tokenData.phone;
+
+		// Lookup the user
+		_data.read('users', userPhone, function(err, userData){
+			if (err || !userData) {
+				callback(403);
+				return;
+			}
+			var userChecks = jsutils.setNonEmptyArray(userData.checks, null);
+			// if there are no user checks initialize with empty array
+			userChecks = !userChecks ? [] : userChecks;
+			if (userChecks.length >= config.maxChecks) {
+				callback(400, {'Error' : 'User already has ' + config.maxChecks + ' checks'});
+				return;
+			}
+			// create a random id for the check
+			var checkId = helpers.createRandomString(20);
+			var checkObject = {
+				'id'             : checkId,
+				'userPhone'      : userPhone,
+				'protocol'       : protocol,
+				'url'            : url,
+				'method'         : method,
+				'successCodes'   : successCodes,
+				'timeoutSeconds' : timeoutSeconds
+			};
+			_data.create('checks', checkId, checkObject, function(err){
+				if (err) {
+					callback(500, {'Error' : 'Could not create the new check'});
+				}
+				userData.checks = userChecks;
+				userData.checks.push(checkId);
+				_data.update('users', userPhone, userData, function(err){
+					if (err) {
+						callback(500, {'Error' : 'Could not update user with new check'});
+						return;
+					}
+					callback(200, checkObject);
+				});
+			});		
+		});
+	});
+};
+
+	//Checks - put
+	//Required data : id
+	// Optional data : protocol, url, method, successCodes, timeoutSeconds (need at least one)
+handlers._checks.put = function(data, callback){
+	// Check that the id is valid
+	var checkId = jsutils.setString(data.payload.id, 20);
+	var tokenId = jsutils.setString(data.headers.token, null);
+	if (!checkId) {
+		callback(400, {'Error' : 'Missing or invalid Id'});
+		return;
+	}
+	var allowedProtocols = ['https', 'http'];
+	var allowedMethods = ['post', 'get', 'put', 'delete'];
+
+	var protocol = jsutils.arrayContains(allowedProtocols, protocol) ? 
+		jsutils.setString(data.payload.protocol, null) : null;
+	var method = jsutils.arrayContains(allowedMethods, method) ?
+		jsutils.setString(data.payload.method, null) : null;
+	var url = jsutils.setString(data.payload.url, null);	
+	var successCodes = jsutils.setNonEmptyArray(data.payload.successCodes);
+	var timeoutSeconds = jsutils.setWholeNumber(data.payload.timeoutSeconds, 0, 6);
+
+	if (!url && !protocol &&  !method && !successCodes && !timeoutSeconds) {
+		callback(400, {'ERROR' : 'Invalid or missing inputs'});
+		return;
+	}
+	_data.read('checks', checkId, function(err, checkData){
+		if (err || !checkData) {
+			callback(400, {'Error' : 'Check Id did not exist'});
+			return;
+		}
+		
+		handlers._common.verifyToken(tokenId, checkData.userPhone, function(tokenIsValid){
+			if (!tokenIsValid) {
+				callback(403);
+				return;
+			}
+			// update with the optional data that was sent
+			checkData.protocol = protocol ? protocol : checkData.protocol;
+			checkData.method = method ? method : checkData.method;
+			checkData.url = url ? url : checkData.url;
+			checkData.successCodes = successCodes ? successCodes : checkData.successCodes;
+			checkData.timeoutSeconds = timeoutSeconds ? timeoutSeconds : checkData.timeoutSeconds;
+			_data.update('checks', checkId, checkData, function(err){
+				if (err) {
+					callback(500, {'Error' : 'Could not update check'});
+					return;
+				}
+				callback(200);				
+			});
+		});
+	});	
+};
+
+	//Checks - delete
+	//Required data : id
+	//No Optional data
+handlers._checks.delete = function(data, callback){
+		// Check that the token Id is valid
+	var checkId = jsutils.setString(data.queryStringObject.id, 20);
+	var tokenId = jsutils.setString(data.headers.token, null);
+	if (!checkId || !tokenId) {
+		callback(400, {'ERROR' : 'Invalid Check Id or Invalid Token'});
+		return;
+	}
+	_data.read('checks', checkId, function(err, checkData){
+		if (err || !checkData) {
+			callback(400, {'ERROR' : 'Could not read check ' + err + checkData});
+			return;
+		}
+		handlers._common.verifyToken(tokenId, checkData.userPhone, function(tokenIsValid){
+			if (!tokenIsValid) {
+				callback(400, {'ERROR' : 'Token is not valid'});
+				return;
+			}
+			_data.delete('checks', checkId, function(err){
+				if (err) {
+					callback(500, {'Error' : 'Could not delete the check'});
+					return;
+				}
+				_data.read('users', checkData.userPhone, function(err, userData){
+					if (err || !userData) {
+						callback(500, {'Error' : 'Could not find User'});
+						return;
+					}				
+					var userChecks = jsutils.setNonEmptyArray(userData.checks, null);
+					var checkPosition = userChecks.indexOf(checkId);
+					if (checkPosition < 0) {
+						callback(500, {'ERROR' : 'Check is not stored on User'});
+						return;
+					}
+					userChecks.splice(checkPosition, 1);
+					_data.update('users', checkData.userPhone, userData, function(err){
+						if (err) {
+							callback(500, {'Error' : 'Could not update user'});
+							return;
+						}
+						callback(200);
+					});				
+				});				
+			});
+		});
+	});
+};
 
  // Export the module
 module.exports = handlers;

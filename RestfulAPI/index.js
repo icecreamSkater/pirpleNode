@@ -11,42 +11,24 @@
 // built in string decoder library
 // config.js file, hard codes that file is in same directory
 
-var http = require('http');
-var https = require('https');
-var config = require('./lib/config');
+
 var servers = require('./lib/servers');
-var fs = require('fs');
+var workers = require('./lib/workers');
 
+//Declare the app
+var app = {};
 
-// Instantiating the http server
-// The server should respond to all requests with a string
-var httpServer = http.createServer(function(req, res){
-	servers.unifiedServer(req, res);
-});
+//Application init function
+app.init = function(){
+	// start the servers
+	servers.init();
 
-// Instantiating the https server
-// The server should respond to all requests with a string
-var httpsServerOptions = {
-	'key' : fs.readFileSync('../https/key.pem'),
-	'cert' : fs.readFileSync('../https/cert.pem')
+	//start the workers
+	workers.init();
 };
 
-var httpsServer = https.createServer(httpsServerOptions, function(req, res){
-	servers.unifiedServer(req, res);
-});
+// Execute
+app.init();
 
-// Call the server function defined above on port found in our config file
-httpServer.listen(config.httpPort, function(){
-	var consoleString = "The server is listening on port " + 
-			config.httpPort + 
-			" in " + config.envName + " mode";
-	console.log(consoleString);
-});
-
-// Call the server function defined above on port found in our config file
-httpsServer.listen(config.httpsPort, function(){
-	var consoleString = "The server is listening on port " + 
-			config.httpsPort + 
-			" in " + config.envName + " mode";
-	console.log(consoleString);
-});
+//Export the app
+module.exports = app;

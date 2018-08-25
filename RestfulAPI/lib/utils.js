@@ -20,26 +20,32 @@ ja_utilities.setString = function(stringValue, stringLength) {
 }
 
 ja_utilities.setNonEmptyArray = function(arrayObject, arrayLength) {
-	if (typeof(arrayObject) != 'object' || !(arrayObject instanceof Array) || arrayObject.length <= 0) return false;
-	if (typeof(arrayLength) == 'number' 
+	if (!arrayObject || typeof(arrayObject) != 'object' || !(arrayObject instanceof Array) || arrayObject.length <= 0) return false;
+//console.log('setNonEmpty Array - array is fine');
+	if (arrayLength && typeof(arrayLength) == 'number' 
 		&& arrayLength > 0 
 		&& arrayObject.length != arrayLength) return false;
-		 
+//console.log('setNonEmpty Array - length is fine');		 
 	return arrayObject;
 }
 
 ja_utilities.setWholeNumber = function(numberObject, min, max) {
-	if (typeof(numberObject) != 'number' || !(numberObject % 1 === 0)) return false;
-	if (typeof(min) == 'number' && numberObject < min) return false;
-	if (typeof(max) == 'number' && numberObject > max) return false;
+	if (!numberObject || typeof(numberObject) != 'number' || !(numberObject % 1 === 0)) return false;
+	if (min && typeof(min) == 'number' && numberObject < min) return false;
+	if (max && typeof(max) == 'number' && numberObject > max) return false;
 		 
 	return numberObject;
 }
 
 ja_utilities.arrayContains = function(arrayObject, containedObject) {
+//console.log('arrayContains');
 	if (!ja_utilities.setNonEmptyArray(arrayObject)) return false;
-		 
-	// return the trimmed value
+//console.log('arrayContains - non empty');
+//console.log('array:' + arrayObject);
+//console.log('array type:' + typeof(arrayObject[0]));
+//console.log('contained and type:' + containedObject + ' ' + typeof(containedObject));
+//console.log('arrayContains:' + arrayObject.indexOf(containedObject));		 
+	// return whether or not value in array
 	return arrayObject.indexOf(containedObject) > -1;
 }
 

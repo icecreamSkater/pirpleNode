@@ -10,6 +10,8 @@ var http = require('http');
 var https = require('https');
 var _data = require('./data');
 var _logs = require('./logs');
+var util = require('util');
+var debug = util.debuglog('workers');
 var helpers = require('./helpers');
 var jsutils = require('./utils');
 
@@ -24,13 +26,13 @@ workers.gatherAllChecks = function() {
 			// This is background function with no one to
 			// callback to.  So log to console
 			//@TODO use a more robust error logging on the back end
-			console.log("Error: Could not find any checks to process");
+			debug("Error: Could not find any checks to process");
 			return;
 		}
 		checks.forEach(function(check){
 			_data.read('checks', check, function(err, originalCheckData){
 				if(err || !originalCheckData) {
-					console.log("Error: Read error on check:" + check);
+					debug("Error: Read error on check:" + check);
 					conitnue;
 				}
 				// Pass the check validator			
@@ -73,7 +75,7 @@ workers.validateCheckData = function(originalCheckData){
 		|| !originalCheckData.url
 		|| !originalCheckData.successCodes
 		|| !originalCheckData.timeoutSeconds) {
-		console.log("Error: Check failed validation:" + check);
+		debug("Error: Check failed validation:" + check);
 		return;
 	}
 	workers.performCheck(originalCheckData);
@@ -165,11 +167,11 @@ workers.processCheckOutcome = function(originalCheckData, checkOutcome) {
 
 	_data.update('checks', newCheckData.id, newCheckData, function(err){
 		if (err) {
-			console.log("Error trying to save check " + newCheckData.id);
+			debug("Error trying to save check " + newCheckData.id);
 			return;
 		}
 		if (!alertWarranted) {
-			console.log('Check outcome has not changed, no alert needed');
+			debug('Check outcome has not changed, no alert needed');
 			return;
 		}
 		workers.alertUserToStatusChange(newCheckData);	
@@ -185,9 +187,9 @@ workers.alertUserToStatusChange = function(newCheckData){
 				+ ' is currently ' + newCheckData.state;
 	helpers.sendTwilioSms(newCheckData.userPhone, msg, function(err){
 		if (!err) {
-			console.log("Success: User was alerted to a status change in their check " + msg);
+			debug("Success: User was alerted to a status change in their check " + msg);
 		} else {
-			console.log("Error: Could not send sms to user who had a state change:" + err);			
+			debug("Error: Could not send sms to user who had a state change:" + err);			
 		}
 	});
 };
@@ -213,10 +215,10 @@ workers.log = function(originalCheckData,checkOutcome,state,alertWarranted,timeO
 	// Append to the log string to the file
 	_logs.append(logFileName, logString, function(err){
 		if (err){
-			console.log("Logging to file failed");
+			debug("Logging to file failed");
 			return;
 		}
-		console.log("Logging to file succeeded");
+		debug("Logging to file succeeded");
 	});
 };
 
@@ -240,7 +242,7 @@ workers.rotateLogs = function() {
 	//list all the non compressed log files
 	_logs.list(false, function(err, logs){
 		if (err || !logs || logs.length <= 0) {
-			console.log("Error : could not find any logs to rotate");
+			debug("Error : could not find any logs to rotate");
 			return;
 		}
 		logs.forEach(function(logName){
@@ -249,15 +251,15 @@ workers.rotateLogs = function() {
 			var newFileId = logId + '-' + Date.now();
 			_logs.compress(logId, newFileId, function(err){
 				if (err) {
-					console.log("Error compressing one of the log files", err);
+					debug("Error compressing one of the log files", err);
 					return;
 				}
 				//Truncate the log
 				_logs.truncate(logId, function(err){
 					if (err) {
-						console.log("Error truncating logFile");
+						debug("Error truncating logFile");
 					} else {
-						console.log("Success truncating logFile");
+						debug("Success truncating logFile");
 					}
 				});
 			});
@@ -267,6 +269,10 @@ workers.rotateLogs = function() {
 
 // Init script
 workers.init = function(){
+	//Send to console, in yellow
+	//
+	console.log('\x1b[33m%s\x1b[0m', 'Background workers are running');
+
 	//Execute all the checks immediately
 	workers.gatherAllChecks();
 

@@ -102,5 +102,121 @@ helpers.sendTwilioSms = function(phone, msg, callback) {
 	req.end();
 };
 
+// Send an mail message via mailGun
+helpers.sendMailgunEmail = function(email, receipt, callback) {
+console.log('starting sendMailgunEmail');
+	//validate the parameters
+	var UserEmail = jsutils.setString(email, null);
+	var UserRcpt = jsutils.setString(receipt, null);
+	if (!UserEmail || !UserRcpt) {
+		callback('Missing either valid email address or receipt');
+		return;
+	}
+console.log('sendMailgunEmail past validation');
+		// Configure the mailGun request payload
+	var payload = {
+		'from'   : config.mailGun.from,
+		'to'   : UserEmail,
+		'subject'   : 'Test',
+		'text' : 'This is a test email from Mailgun' //UserRcpt
+	};
+
+	// Stringify the payload
+	var stringPayload = querystring.stringify(payload);
+
+	//Configure the request details
+	var requestDetails = {
+		'protocol'       : 'https:',
+		'hostname'       : 'api.mailgun.net',
+		'method'         : 'POST',
+		'path'           : '/v3/' + config.mailGun.url,
+		'auth'           : 'api:' + config.mailGun.apiKey,
+		'headers'        : {
+			'Content-Type'   : 'application/x-www-form-urlencoded'
+		}		
+	};
+
+	// Instantiate the request object
+	var req = https.request(requestDetails, function(res){
+		// Grab the status of the sent response
+		var status = res.statusCode;
+console.log('sendMailgunEmail response:\n' + res.statusCode + '\n' + res.statusMessage );
+		if (status == 200 || status == 201) {
+			callback(false);
+		} else {
+		    callback('Status code returned was ' + status);
+		}
+	});
+console.log('sendMailgunEmail request initiated');
+	// Bind to the error event so it doesn't get thrown and kill the thread
+	req.on('error', function(e){
+		callback(e);
+	});
+
+	// Add payload to the request
+	req.write(stringPayload);
+
+	//End the request -- which is the same as sending it off
+	req.end();
+}
+
+// Send a payment via stripe
+helpers.sendStripePayment = function(chrgToken, chrgAmount, callback) {
+	//validate the parameters
+	var token = jsutils.setString(chrgToken, null);
+	var orderAmt = (!chrgAmount || typeof(chrgAmount) != 'number') ? false : chrgAmount;
+
+	if (!token || !orderAmt) {
+		callback('Missing either Order Amount or Charge Token');
+		return;
+	}
+console.log('sendStripePayment past validation');
+		// Configure the mailGun request payload
+	var payload = {
+		'amount'      : orderAmt,
+		'currency'    : config.stripe.currency,
+		'description' : 'Test',
+		'source'      : token
+	};
+
+	// Stringify the payload
+	var stringPayload = querystring.stringify(payload);
+
+	//Configure the request details
+	var requestDetails = {
+		'protocol'       : 'https:',
+		'hostname'       : 'api.stripe.com',
+		'method'         : 'POST',
+		'path'           : '/v1/charges',
+		'auth'           : 'api:' + config.stripe.apiKey,
+		'headers'        : {
+			'Content-Type'   : 'application/x-www-form-urlencoded'
+		}		
+	};
+
+	// Instantiate the request object
+	var req = https.request(requestDetails, function(res){
+		// Grab the status of the sent response
+		var status = res.statusCode;
+console.log('sendStripePayment response:\n' + res.statusCode + '\n' + res.statusMessage );
+		if (status == 200 || status == 201) {
+			callback(false);
+		} else {
+		    callback('Status code returned was ' + status);
+		}
+	});
+console.log('sendStripePayment request initiated');
+	// Bind to the error event so it doesn't get thrown and kill the thread
+	req.on('error', function(e){
+		callback(e);
+	});
+
+	// Add payload to the request
+	req.write(stringPayload);
+
+	//End the request -- which is the same as sending it off
+	req.end();
+}
+
  // Export the module
  module.exports = helpers;

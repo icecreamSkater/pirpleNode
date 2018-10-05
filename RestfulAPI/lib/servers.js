@@ -12,6 +12,8 @@ var https = require('https');
 var config = require('./config');
 var fs = require('fs');
 var path = require('path');
+var util = require('util');
+var debug = util.debuglog('server');
 
  // Container for all the helpers
 var servers = {};
@@ -77,8 +79,15 @@ servers.unifiedServer = function(req, res) {
 			res.end(payloadString); // Send the response
 
 			// Log the response
-			var responseString = 'Returning this response: ';
-			console.log(responseString, statusCode, payloadString);
+			// If the response is 200, print green otherwise print red
+			var consoleString = method.toUpperCase() + ' /' + trimmedPath + ' ' + statusCode;
+			if (statusCode == 200){
+				debug('\x1b[32m%s\x1b[0m', consoleString);
+			} else {
+				consoleString += config.httpsPort;
+				debug('\x1b[31m%s\x1b[0m', consoleString);
+			}
+			//debug(responseString, statusCode, payloadString);
 		});
 	});	
 };
@@ -107,7 +116,7 @@ servers.init = function(){
 		var consoleString = "The server is listening on port " + 
 				config.httpPort + 
 				" in " + config.envName + " mode";
-		console.log(consoleString);
+		console.log('\x1b[35m%s\x1b[0m', consoleString);
 	});
 
 	// Call the server function defined above on port found in our config file
@@ -115,7 +124,7 @@ servers.init = function(){
 		var consoleString = "The server is listening on port " + 
 				config.httpsPort + 
 				" in " + config.envName + " mode";
-		console.log(consoleString);
+		console.log('\x1b[36m%s\x1b[0m', consoleString);
 	});
 
 };

@@ -6,6 +6,8 @@ var crypto = require('crypto');
 var https = require('https');
 var querystring = require('querystring');
 var config = require('./config');
+
+var stripe = require('stripe')(config.stripe.secret);
 var jsutils = require('./utils');
 
  // Container for all the helpers
@@ -170,52 +172,25 @@ helpers.sendStripePayment = function(chrgToken, chrgAmount, callback) {
 		callback('Missing either Order Amount or Charge Token');
 		return;
 	}
-console.log('sendStripePayment past validation');
-		// Configure the mailGun request payload
-	var payload = {
-		'amount'      : orderAmt,
-		'currency'    : config.stripe.currency,
-		'description' : 'Test',
-		'source'      : token
-	};
+	orderAmt = (orderAmt * 100).toFixed(0);
 
-	// Stringify the payload
-	var stringPayload = querystring.stringify(payload);
+	const charge = stripe.charges.create({
+	  'amount'        : orderAmt,
+	  'currency'      : config.stripe.currency,
+	  'source'        : token,
+	  'receipt_email' : 'jenny.rosen@example.com',
+	});
 
-	//Configure the request details
-	var requestDetails = {
-		'protocol'       : 'https:',
-		'hostname'       : 'api.stripe.com',
-		'method'         : 'POST',
-		'path'           : '/v1/charges',
-		'auth'           : 'api:' + config.stripe.apiKey,
-		'headers'        : {
-			'Content-Type'   : 'application/x-www-form-urlencoded'
-		}		
-	};
-
-	// Instantiate the request object
-	var req = https.request(requestDetails, function(res){
-		// Grab the status of the sent response
-		var status = res.statusCode;
-console.log('sendStripePayment response:\n' + res.statusCode + '\n' + res.statusMessage );
-		if (status == 200 || status == 201) {
+	charge.then(
+		function(chargeResult){
+console.log('in the successful part of the charge then ' + chargeResult.amount);
+			// send the receipt email
 			callback(false);
-		} else {
-		    callback('Status code returned was ' + status);
 		}
-	});
-console.log('sendStripePayment request initiated');
-	// Bind to the error event so it doesn't get thrown and kill the thread
-	req.on('error', function(e){
-		callback(e);
-	});
-
-	// Add payload to the request
-	req.write(stringPayload);
-
-	//End the request -- which is the same as sending it off
-	req.end();
+		,function(err){
+			callback('Stripe charge failed');
+		}
+	);	
 }
 
  // Export the module

@@ -23,6 +23,10 @@ var environments = {};
  		'from'		 : 'Mailgun Sandbox <postmaster@sandbox4ac609fe63994eedb1201f58bfd81bc2.mailgun.org>'
  	},
  	'stripe'		 : {
+ 		'secret'	 : 'sk_test_MOtua5hei9jXQObGt2s2E8Pi',
+ 		'pKey'	     : 'pk_test_tnXFoHL97nslK2dLkaCPe8IB',
+ 		'currency'   : 'usd',
+ 		'description': 'Pizza Payment'
  	}
  };
 
@@ -44,7 +48,8 @@ var environments = {};
  		'from'		 : 'Mailgun Sandbox <postmaster@sandbox4ac609fe63994eedb1201f58bfd81bc2.mailgun.org>'
  	},
  	'stripe'		 : {
- 		'apikey'	 : 'sk_test_MOtua5hei9jXQObGt2s2E8Pi',
+ 		'secret'	 : 'sk_test_MOtua5hei9jXQObGt2s2E8Pi',
+ 		'pKey'	     : 'pk_test_tnXFoHL97nslK2dLkaCPe8IB',
  		'currency'   : 'usd',
  		'description': 'Pizza Payment'
  	}

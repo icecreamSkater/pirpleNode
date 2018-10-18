@@ -2,21 +2,33 @@
  * Library for storing and rotating logs
  */
 
-  //Dependencies
-var fs = require('fs');
+/***************************************
+	Dependencies
+***************************************/
+//modules within node
+var fs   = require('fs');
 var path = require('path');
 var zlib = require('zlib');  // file compression
 
 // container for the logging library
-var lib = {};
+var loglib = {};
+/***************************************
+	Servers Container
+		loglib.baseDir - Base directory of the log folder
+		loglib.append - Append a string to a file.  Create the file if it does not exist
+		loglib.list - list all logs and optionally include compressed logs
+		loglib.compress - compress the contents of one .log file into a .gz.b64 file within the same directory
+		loglib.decompress - decompress the contents of a .g.b64 file into a string variable
+		loglib.truncate - truncate a log file
+***************************************/
 
 // Base directory of the log folder
-lib.baseDir = path.join(__dirname, '/../.logs');
+loglib.baseDir = path.join(__dirname, '/../.logs');
 
 // Append a string to a file.  Create the file if it does not exist.
-lib.append = function(file, str, callback) {
+loglib.append = function(file, str, callback) {
 	// open the file for appending
-	fs.open(lib.baseDir + '/' + file + '.log', 'a', function(err, fileDescriptor){
+	fs.open(loglib.baseDir + '/' + file + '.log', 'a', function(err, fileDescriptor){
 		if (err || !fileDescriptor) {
 			callback('Could not open log file for appending');
 			return;
@@ -38,8 +50,8 @@ lib.append = function(file, str, callback) {
 };
 
 // list all logs and optionally include compressed logs
-lib.list = function(includeCompressedLogs, callback) {//(false, function(err, logs){
-	fs.readdir(lib.baseDir, function(err, data){
+loglib.list = function(includeCompressedLogs, callback) {//(false, function(err, logs){
+	fs.readdir(loglib.baseDir, function(err, data){
 		if (err || !data || data.length <= 0) {
 			callback(err, data);
 			return;
@@ -61,12 +73,12 @@ lib.list = function(includeCompressedLogs, callback) {//(false, function(err, lo
 };
 
 // compress the contents of one .log file into a .gz.b64 file within the same directory
-lib.compress = function(logId, newFileId, callback){
+loglib.compress = function(logId, newFileId, callback){
 	var sourceFile = logId + '.log';
 	var destFile = newFileId + '.gz.b64';
 
 	//Read the source file
-	fs.readFile(lib.baseDir + '/' + sourceFile, 'utf8', function(err, inputString){
+	fs.readFile(loglib.baseDir + '/' + sourceFile, 'utf8', function(err, inputString){
 		if (err || !inputString){
 			callback(err);
 			return;
@@ -77,7 +89,7 @@ lib.compress = function(logId, newFileId, callback){
 				return;
 			}
 			// Send the new compressed data to the destination file
-			fs.open(lib.baseDir + '/' + destFile, 'wx', function(err, fileDescriptor){
+			fs.open(loglib.baseDir + '/' + destFile, 'wx', function(err, fileDescriptor){
 				if (err || !fileDescriptor) {
 					callback(err);
 					return;
@@ -103,9 +115,9 @@ lib.compress = function(logId, newFileId, callback){
 };
 
 // decompress the contents of a .g.b64 file into a string variable
-lib.decompress = function(fileId, callback){
+loglib.decompress = function(fileId, callback){
 	var fileName = fileId + '.gz.b64';
-	fs.readFile(lib.baseDir + '/' + fileName, 'utf8', function(err, str){
+	fs.readFile(loglib.baseDir + '/' + fileName, 'utf8', function(err, str){
 		if (err || !str) {
 			callback(err);
 			return;
@@ -127,8 +139,8 @@ lib.decompress = function(fileId, callback){
 
 
 //truncate a log file
-lib.truncate = function(logId, callback){//(logId, function(err)
-	fs.truncate(lib.baseDir + '/' + logId  + '.log', 0, function(err){
+loglib.truncate = function(logId, callback){//(logId, function(err)
+	fs.truncate(loglib.baseDir + '/' + logId  + '.log', 0, function(err){
 		if (err) {
 			callback(err);
 			return;
@@ -137,6 +149,8 @@ lib.truncate = function(logId, callback){//(logId, function(err)
 	});
 };
 
-
-// Export the module
-module.exports = lib;
+/***************************************
+	Exports
+		- loglib
+***************************************/
+module.exports = loglib;

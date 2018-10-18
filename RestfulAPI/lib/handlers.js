@@ -1,13 +1,41 @@
 /*
 	Create and export server handler functions
  */
- var videos = require('./videos');
- var _data = require('./data');
- var helpers = require('./helpers');
- var jsutils = require('./utils');
- var config = require('./config');
 
-// Containers for token handler private objects and functions
+//modules written for this project
+var videos  = require('./videos');
+var _data   = require('./data');
+var helpers = require('./helpers');
+var jsutils = require('./utils');
+var config  = require('./config');
+var pdata    = require('../.data/testdata');
+
+/***************************************
+	Handlers Container
+		handlers.ping - simple ping function
+		handlers.hello - simple function for homework 1, videos
+		handlers.users - call the appropriate user handler
+		handlers.tokens - call the appropriate token handler
+		handlers.checks - call the appropriate checks handler
+		handlers.notFound - 
+		handlers._users - container for data and functions related to users
+			_users.post
+			_users.get
+			_users.put
+			_users.delete
+		handlers._tokens - container for data and functions related to tokens
+			_tokens.post
+			_tokens.get
+			_tokens.put
+			_tokens.delete
+		handlers._common - container for data and functions related to common, these are functions common to other handlers
+			_common.verifyToken = match a token to a user, and verify that the token is not expired
+		handlers._checks - container for data and functions related to checks
+			_checks.post
+			_checks.get
+			_checks.put
+			_checks.delete		
+***************************************/
 handlers = {};
 handlers._users = {};
 handlers._tokens = {};
@@ -64,14 +92,17 @@ handlers.notFound = function(data, callback) {
 	callback(404);
 };
 
+/***************************************
+	Common - functions
+***************************************/
+
 // Containers for handler private objects and functions
-// users private methods
 
 // Verify that a given token id is currently valid for a given user
-handlers._common.verifyToken = function(id, phone, callback) {
+handlers._common.verifyToken = function(id, userid, callback) {
 	//look up the token
 	_data.read('tokens', id, function(err, tokenData){
-		if (err || !tokenData || tokenData.phone != phone || tokenData.expires <= Date.now()) {
+		if (err || !tokenData || tokenData.userid != userid || tokenData.expires <= Date.now()) {
 			callback(false);
 			return;
 		}
@@ -79,26 +110,35 @@ handlers._common.verifyToken = function(id, phone, callback) {
 	});
 };
 
+/***************************************
+	Users - handlers
+***************************************/
+
 	//Users - post
 	// Required data: firstName, lastName, phone, password, tosAgreement
 	// No optional data
+	// to test changing user data, ?mode="userdata", put {"token":tokenid} in the header, and in the payload must include username or phone and something to change
+	// to test ordering a pizza, put {"token":tokenid} in the header, and {"pizzaname":quantity} in the payload
 handlers._users.post = function(data, callback){
 	// Check that all required fields are filled out
 	var firstName = jsutils.setString(data.payload.firstName, null);
 	var lastName = jsutils.setString(data.payload.lastName, null);
+	var email = jsutils.setString(data.payload.email, null);
+	var username = jsutils.setString(data.payload.username, null);
 	var phone = jsutils.setString(data.payload.phone, 10);
 	var password = jsutils.setString(data.payload.password, null);
 	var tosAgreement = typeof(data.payload.tosAgreement) == 'boolean' && data.payload.tosAgreement == true ?
 		true : false;
 
 	// check for required data
-	if (!firstName || !lastName || !password || !phone || !tosAgreement) {
+	if (!firstName || !lastName || !password || (!phone && !email && !username) || !tosAgreement) {
 		callback(400, {'Error' : 'Missing required fields'});
 		return;
 	}
 
+	var filename = !username ? phone : username;
 	// make sure that the user doesn't already exist based on phone number
-	_data.read('users', phone, function(err, data){
+	_data.read('users', filename, function(err, data){
 		if (!err) {
 			// if the user exists callback with error and return
 			callback(400, {'Error' : 'A user with that phone number already exists'});
@@ -114,14 +154,17 @@ handlers._users.post = function(data, callback){
 		}
 		//Create the user
 		var userObject = {
+			'username'		 : username,
 			'firstName' 	 : firstName,
 			'lastName' 		 : lastName,
 			'phone' 		 : phone,
+			'email'			 : email,
 			'hashedPassword' : hashedPassword,
 			'tosAgreement' 	 : true
 		};
+		var fileName = !username ? phone : username;
 		// persist the user to disk -- fake save to database TODO replace with real database support
-		_data.create('users', phone, userObject, function(err){
+		_data.create('users', fileName, userObject, function(err){
 			if (!err) {
 				callback(200);
 			} else {
@@ -132,60 +175,129 @@ handlers._users.post = function(data, callback){
 	});
 };
 
+	//Users - getMenu
+	// called by user get if requesting a menu -- TODO pull these individual getBlah functions
+	// into a router
+handlers._users.getMenu = function(callback){
+	callback(false, pdata.pizzaMenu);
+}
+
+	//Users - getUserInfo
+	// called by user get if requesting a user info (default) -- TODO pull these individual getBlah functions
+	// into a router
+handlers._users.getUserInfo = function(filename, callback){
+	_data.read('users', filename, function(err, data){
+		if (!err && data) {
+			// remove the hashed password from the user object before returning it
+			delete data.hashedPassword;
+			callback(false, data);
+		} else {
+			callback(true, {'Error' : 'Read error when accessing user'});
+		}
+	});	
+}
+
 	//Users - get
-	// Required data: phone
+	// Required data: phone or username
 	// No optional data
 handlers._users.get = function(data, callback){
+	// what is the user getting?
+	var mode = jsutils.setString(data.queryStringObject.mode, null);
+	if (!mode) {
+		mode = 'userData';
+	}
+
 	// Check that the phone number is valid
 	var phone = jsutils.setString(data.queryStringObject.phone, 10);
-	if (!phone) {
+	var username = jsutils.setString(data.queryStringObject.username, null);
+	if (!phone && !username) {
 		callback(400, {'Error' : 'Missing required field'});
 		return;
 	}
+	var filename = !username ? phone : username;
 	// Get the token from the headers
 	var token = jsutils.setString(data.headers.token, null);
-
-	handlers._common.verifyToken(token, phone, function(tokenIsValid){
+	handlers._common.verifyToken(token, filename, function(tokenIsValid){
 		if (!tokenIsValid) {
 			callback(403, {'Error' : 'Token authentication failed'});
 			return;
-		}	
-		_data.read('users', phone, function(err, data){
-			if (!err && data) {
-				// remove the hashed password from the user object before returning it
-				delete data.hashedPassword;
-				callback(200, data);
-			} else {
-				callback(404, {'Error' : 'Read error when accessing user'});
-			}
-		});
+		}
+
+		// if the mode is menu, then return the pizza menu
+		switch(mode) {
+			case "menu" :
+				handlers._users.getMenu(function(err, menuData){
+					var statusValue = err ? 404 : 200;
+					callback(statusValue, menuData);
+				});
+				break;
+			case "userData" :
+				handlers._users.getUserInfo(filename, function(err, readData){
+					var statusValue = err ? 404 : 200;
+					callback(statusValue, readData);
+				});
+				//no break == default
+		}
 	});
 };
+
+	//Users - submitOrder
+	// called by user put to place a pizza order -- TODO pull these individual getBlah functions
+	// into a router
+handlers._users.submitOrder = function(callback){
+console.log("blah");
+
+	helpers.sendStripePayment('tok_visa', 45.37, 'janeen@janglya.com', 'Large Cheese', function(err){
+		if (!err) {
+			console.log("Success: !!!!");
+			callback(false);
+		} else {
+			console.log("Error: Could process payment:" + err);	
+			callback(true);		
+		}
+	});	
+}
 
 	//Users - put
 	//Required data : phone
 	//Optional data (at least one is required) : firstName, lastName, password
 handlers._users.put = function(data, callback){
+	// what is the user putting?
+	var mode = jsutils.setString(data.queryStringObject.mode, null);
+	if (!mode) {
+		mode = 'userdata';
+	}
 
 	var phone = jsutils.setString(data.payload.phone, 10);
+	var email = jsutils.setString(data.payload.email, null);
+	var username = jsutils.setString(data.payload.username, null);
 	var firstName = jsutils.setString(data.payload.firstName, null);
 	var lastName = jsutils.setString(data.payload.lastName, null);
 	var password = jsutils.setString(data.payload.password, null);
+	var filename = !username ? phone : username;
 
-	if ((!firstName && !lastName && !password)  || !phone) {
+	if ((!firstName && !lastName && !password)  || (!phone && !username)) {
 		callback(400, {'Error' : 'Missing required field or fields to update'});
 		return;
 	}
 
 	// Get the token from the headers
 	var token = jsutils.setString(data.headers.token, null);
-
-	handlers._common.verifyToken(token, phone, function(tokenIsValid){
+console.log("user put headers " + token + " " + data.headers.token + " " + filename + " " + mode);
+	handlers._common.verifyToken(token, filename, function(tokenIsValid){
+console.log("verify " + tokenIsValid + " " + mode);
 		if (!tokenIsValid) {
 			callback(403, {'Error' : 'Token authentication failed'});
 			return;
 		}
-		_data.read('users', phone, function(err, userData){
+		// if the mode is menu, then return the pizza menu
+		if (mode == "order") {
+console.log("orders ");
+			handlers._users.submitOrder(function(err){});
+			return;
+		}
+
+		_data.read('users', filename, function(err, userData){
 			if(err || !userData) {
 				callback(400, {'Error' : 'The specified user does not exist'});
 				return;
@@ -194,9 +306,8 @@ handlers._users.put = function(data, callback){
 			userData.firstName = firstName ? firstName : userData.firstName;
 			userData.lastName = lastName ? lastName : userData.lastName;
 			userData.hashedPassword = password ? helpers.hash(password) : userData.hashedPassword;
-
-			//store the new updates
-			_data.update('users', phone, userData, function(err){
+			
+			_data.update('users', filename, userData, function(err){
 				if (!err){
 					callback(200);
 				} else {
@@ -214,24 +325,25 @@ handlers._users.put = function(data, callback){
 handlers._users.delete = function(data, callback){
 	// Check that the phone number is valid
 	var phone = jsutils.setString(data.queryStringObject.phone, 10);
-	if (!phone) {
+	var username = jsutils.setString(data.queryStringObject.username, null);
+	var filename = !username ? phone : username;
+	if (!filename) {
 		callback(400, {'Error' : 'Missing required field'});
 		return;
 	}
 	// Get the token from the headers
 	var token = jsutils.setString(data.headers.token, null);
-
-	handlers._common.verifyToken(token, phone, function(tokenIsValid){
+	handlers._common.verifyToken(token, filename, function(tokenIsValid){
 		if (!tokenIsValid) {
 			callback(403, {'Error' : 'Token authentication failed'});
 			return;
 		}
-		_data.read('users', phone, function(err, data){
+		_data.read('users', filename, function(err, data){
 			if (err || !data) {
 				callback(400, {'Error' : 'could not find the specified user'});
 				return;
 			}
-			_data.delete('users', phone, function(err){
+			_data.delete('users', filename, function(err){
 				if (err) {
 					callback(500, {'Error' : 'Could not delete the specified user'});
 					return;					
@@ -263,22 +375,30 @@ handlers._users.delete = function(data, callback){
 	});
 };
 
+/***************************************
+	Tokens - handlers
+***************************************/
+
 	//Tokens - post
 	//Required data : phone, password
 	// No Optional data
+	// to test send payload {"password":"thepassword","username":"theusername"}, if this is checks related is should be phone not username
+
 handlers._tokens.post = function(data, callback){
 	// Check that all required fields are filled out
-	var phone = jsutils.setString(data.payload.phone, 10);
+	var phone = jsutils.setString(data.payload.userid, 10);
+	var username = jsutils.setString(data.payload.username, null);
 	var password = jsutils.setString(data.payload.password, null);
-
+	var filename = !username ? phone : username;
+	 
 	// check for required data
-	if (!password || !phone) {
+	if (!password || !filename) {
 		callback(400, {'Error' : 'Missing required fields'});
 		return;
 	}
 
 	// get the requested User
-	_data.read('users', phone, function(err, userData){
+	_data.read('users', filename, function(err, userData){
 		if (err) {
 			// if the user is not found then callback
 			callback(400, {'Error' : 'Could not find specified User'});
@@ -298,7 +418,7 @@ handlers._tokens.post = function(data, callback){
 		var tokenId = helpers.createRandomString(20);
 		var expires = Date.now() + 1000 * 60 * 60;
 		var tokenObject = {
-			'phone'   : phone,
+			'userid'   : filename,
 			'id'      : tokenId,
 			'expires' : expires
 		};
@@ -336,7 +456,10 @@ handlers._tokens.get = function(data, callback){
 	//Tokens - put
 	//Required data : id, extend
 	// @TODO make extension time configurable
+	//
+	// to test send payload {"id":"20characterid","extend":true}, but if the token is expired it must be posted anew
 handlers._tokens.put = function(data, callback){
+
 	// Check that the id is valid
 	var tokenId = jsutils.setString(data.payload.id, 20);
 	var extend = typeof(data.payload.extend) == 'boolean' ? data.payload.extend : false;
@@ -372,7 +495,6 @@ handlers._tokens.put = function(data, callback){
 };
 
 	//Tokens - delete (deleting a token is the same as logging out)
-	//Required data : phone
 handlers._tokens.delete = function(data, callback){
 	// Check that the token Id is valid
 	var tokenId = jsutils.setString(data.queryStringObject.id, 20);
@@ -380,6 +502,7 @@ handlers._tokens.delete = function(data, callback){
 		callback(400, {'Error' : 'Invalid Token Id'});
 		return;
 	}
+
 	_data.read('tokens', tokenId, function(err, data){
 		if (err || !data) {
 			callback(400, {'Error' : 'could not find the specified token'});
@@ -394,6 +517,10 @@ handlers._tokens.delete = function(data, callback){
 		});
 	});
 };
+
+/***************************************
+	Checks - handlers
+***************************************/
 
 	//Checks - get
 	//Required data : id
@@ -421,9 +548,6 @@ handlers._checks.get = function(data, callback){
 			callback(200, checkData);
 		});
 	});
-
-
-
 };
 
 	// Checks - post
@@ -453,10 +577,10 @@ handlers._checks.post = function(data, callback){
 			callback(403);
 			return;
 		}
-		var userPhone = tokenData.phone;
+		var userId = tokenData.userid;
 
 		// Lookup the user
-		_data.read('users', userPhone, function(err, userData){
+		_data.read('users', userId, function(err, userData){
 			if (err || !userData) {
 				callback(403);
 				return;
@@ -602,5 +726,8 @@ handlers._checks.delete = function(data, callback){
 	});
 };
 
- // Export the module
+/***************************************
+	Exports
+		- handlers
+***************************************/
 module.exports = handlers;

@@ -25,7 +25,7 @@ var app = {};
 app.init = function(){
 	// start the servers
 	servers.init();
-//sendMailgunEmail = function(email, receipt, callback)
+
 //	helpers.sendMailgunEmail('janeen@janglya.com', 'receipt, but this message will be ignored', function(err){
 //		if (!err) {
 //			console.log("Success: !!!!");
@@ -34,17 +34,13 @@ app.init = function(){
 //		}
 //	});
 
-//helpers.sendStripePayment = function(chrgToken, chrgAmount, callback)
-	helpers.sendStripePayment('tok_visa', 45.37, function(err){
+	helpers.sendStripePayment('tok_visa', 45.37, 'janeen@janglya.com', 'Large Cheese', function(err){
 		if (!err) {
 			console.log("Success: !!!!");
 		} else {
 			console.log("Error: Could process payment:" + err);			
 		}
 	});
-
-	//start the workers
-//	workers.init();
 };
 
 // Execute

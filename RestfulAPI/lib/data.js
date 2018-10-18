@@ -1,25 +1,37 @@
 /* 
 Library for storing and editing data
 */
+/***************************************
+	Dependencies
+***************************************/
+//modules within node
+var fs      = require('fs');
+var path    = require('path');
 
-//Dependencies
-
-var fs = require('fs');
-var path = require('path');
+//modules written for this project
 var helpers = require('./helpers');
 
-// Container for this module
+/***************************************
+	Library Container
+		datalib.baseDir - Base directory of the data folder
+		datalib.create - Write data to a file
+		datalib.read - Read data from a file
+		datalib.update - Update the file, this operation truncates the existing file
+		datalib.delete - Delete a file
+		datalib.list - list all the files in a directory
+***************************************/
 // the .data directory is like a poor man's database
 // subdirectories serve the purpose of database tables (users, tokens)
-var lib = {};
+/*************************************/
+var datalib = {};
 
 // Base directory of the data folder
-lib.baseDir = path.join(__dirname, '/../.data');
+datalib.baseDir = path.join(__dirname, '/../.data');
 
 // Write data to a file
-lib.create = function(dir, file, data, callback){
+datalib.create = function(dir, file, data, callback){
 	// Open the file for writing, exclude existing files
-	fs.open(lib.baseDir + '/' + dir + '/' + file + '.json', 'wx', function(err, fileDescriptor){
+	fs.open(datalib.baseDir + '/' + dir + '/' + file + '.json', 'wx', function(err, fileDescriptor){
 		if (!err && fileDescriptor) {
 			// Convert data to string
 			var stringData = JSON.stringify(data);
@@ -44,8 +56,8 @@ lib.create = function(dir, file, data, callback){
 	});
 };
 
-lib.read = function(dir, file, callback) {
-	fs.readFile(lib.baseDir + '/' + dir + '/' + file + '.json', 'utf8', function(err, data){
+datalib.read = function(dir, file, callback) {
+	fs.readFile(datalib.baseDir + '/' + dir + '/' + file + '.json', 'utf8', function(err, data){
 		if (err || !data) {
 			callback(err, data);
 		} else {
@@ -56,9 +68,9 @@ lib.read = function(dir, file, callback) {
 	});
 };
 
-lib.update = function(dir, file, data, callback) {
+datalib.update = function(dir, file, data, callback) {
 	// open existing file for writing
-	fs.open(lib.baseDir + '/' + dir + '/' + file + '.json', 'r+', function(err, fileDescriptor){
+	fs.open(datalib.baseDir + '/' + dir + '/' + file + '.json', 'r+', function(err, fileDescriptor){
 		if (!err && fileDescriptor) {
 			// Convert the data to string
 			var stringData = JSON.stringify(data);
@@ -91,9 +103,9 @@ lib.update = function(dir, file, data, callback) {
 
 };
 
-lib.delete = function(dir, file, callback) {
+datalib.delete = function(dir, file, callback) {
 	// unlink the file
-	fs.unlink(lib.baseDir + '/' + dir + '/' + file + '.json', function(err){
+	fs.unlink(datalib.baseDir + '/' + dir + '/' + file + '.json', function(err){
 		if (!err){
 			callback(false);
 		} else {
@@ -103,8 +115,8 @@ lib.delete = function(dir, file, callback) {
 };
 
 //List all the items in a directory
-lib.list = function(dir, callback){
-	fs.readdir(lib.baseDir + '/' + dir + '/', function(err, data){
+datalib.list = function(dir, callback){
+	fs.readdir(datalib.baseDir + '/' + dir + '/', function(err, data){
 		if (err || !data || data.length <= 0) {
 			callback(err, data);
 			return;
@@ -117,5 +129,8 @@ lib.list = function(dir, callback){
 	});
 };
 
-// Export the module
-module.exports = lib;
+/***************************************
+	Exports
+		- datalib
+***************************************/
+module.exports = datalib;

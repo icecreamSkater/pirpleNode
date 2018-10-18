@@ -2,6 +2,17 @@
 	Create and export configuration variables
  */
 
+/***************************************
+	Environments Container
+		environments.staging - creates a SHA256 hash using the hashing secret in the config module
+		environments.production - parse a JSON string to an object, fall back to an new empty object on error
+			-httpPort
+			-httpsPort
+			-hashingSecret
+			-twilio container
+			-mailGun container
+			-stripe container
+***************************************/
 // Container for all the environments
 var environments = {};
 
@@ -59,9 +70,12 @@ var environments = {};
  var currentEnvironment = typeof(process.env.NODE_ENV) == 'string' ?
  	process.env.NODE_ENV.toLowerCase() : '';
 
- // select our defined environments or set a default
+ // select our defined environments or set a staging as default
  var environmentToExport = typeof(environments[currentEnvironment]) == 'object' ?
  	environments[currentEnvironment] : environments['staging'];
 
-// Export the module
+/***************************************
+	Exports
+		- environmentToExport
+***************************************/
 module.exports = environmentToExport;

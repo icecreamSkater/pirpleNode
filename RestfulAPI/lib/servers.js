@@ -1,24 +1,40 @@
 /*
  Servers
  */
-//Dependencies
-var jsutils = require('./utils');
-var helpers = require('./helpers');
-var url = require('url');
-var handlers = require('./handlers');
+
+/***************************************
+	Dependencies
+***************************************/
+//modules within node
+var url           = require('url');
 var StringDecoder = require('string_decoder').StringDecoder;
-var http = require('http');
-var https = require('https');
-var config = require('./config');
-var fs = require('fs');
-var path = require('path');
-var util = require('util');
-var debug = util.debuglog('server');
+var http          = require('http');
+var https         = require('https');
+var fs            = require('fs');
+var path          = require('path');
+var util          = require('util');
+var debug         = util.debuglog('server');
+
+//modules written for this project
+var jsutils  = require('./utils');
+var helpers  = require('./helpers');
+var handlers = require('./handlers');
+var config   = require('./config');
 
  // Container for all the helpers
+ /***************************************
+	Servers Container
+		servers.unifiedServer - calls the router to choose the correct handler
+		servers.httpServer - 		 
+		servers.httpsServer - 
+		servers.httpsServerOptions -
+		servers.init - called by the file that is executed from the command line
+		servers.router - 
+***************************************/
 var servers = {};
 
 // All the server logic for both http and https
+// Called by create server
 servers.unifiedServer = function(req, res) {
 	// Get the URL and parse it with parseQueryString set to true
 	var parsedUrl = url.parse(req.url, true);
@@ -141,4 +157,8 @@ servers.router = {
 };
 
  // Export the module
+/***************************************
+	Exports
+		- servers
+***************************************/
  module.exports = servers;

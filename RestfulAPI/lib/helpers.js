@@ -1,17 +1,31 @@
 /*
  Helpers for Server
  */
-//Dependencies
-var crypto = require('crypto');
-var https = require('https');
+/***************************************
+	Dependencies
+***************************************/
+//modules within node
+var crypto      = require('crypto');
+var https       = require('https');
 var querystring = require('querystring');
-var config = require('./config');
 
-var stripe = require('stripe')(config.stripe.secret);
+//modules written for this project
+var config  = require('./config');
 var jsutils = require('./utils');
 
- // Container for all the helpers
- var helpers = {};
+//modules from third parties
+var stripe  = require('stripe')(config.stripe.secret);
+
+/***************************************
+	Helpers Container
+		helpers.hash - creates a SHA256 hash using the hashing secret in the config module
+		helpers.parseJsonToObject - parse a JSON string to an object, fall back to an new empty object on error
+		helpers.createRandomString - create a random string of specified length, from lower case letters and numerals
+		helpers.sendTwilioSms - send a specified message to a specified phone number using Twilio
+		helpers.sendMailgunEmail - send a specified message to a specified email address using mailgun
+		helpers.sendStripePayment - make a specified charge to a tokenized card using Stripe, if successful send specified email
+***************************************/
+var helpers = {};
 
 // Create a SHA256 hash
 helpers.hash = function(str) {
@@ -105,22 +119,22 @@ helpers.sendTwilioSms = function(phone, msg, callback) {
 };
 
 // Send an mail message via mailGun
-helpers.sendMailgunEmail = function(email, receipt, callback) {
-console.log('starting sendMailgunEmail');
+helpers.sendMailgunEmail = function(emailAddr, emailMsg, callback) {
+
 	//validate the parameters
-	var UserEmail = jsutils.setString(email, null);
-	var UserRcpt = jsutils.setString(receipt, null);
-	if (!UserEmail || !UserRcpt) {
+	var UserEmailAddr = jsutils.setString(emailAddr, null);
+	var UserEmailMsg = jsutils.setString(emailMsg, null);
+	if (!UserEmailAddr || !UserEmailMsg) {
 		callback('Missing either valid email address or receipt');
 		return;
 	}
-console.log('sendMailgunEmail past validation');
+
 		// Configure the mailGun request payload
 	var payload = {
 		'from'   : config.mailGun.from,
-		'to'   : UserEmail,
+		'to'   : UserEmailAddr,
 		'subject'   : 'Test',
-		'text' : 'This is a test email from Mailgun' //UserRcpt
+		'text' : UserEmailMsg
 	};
 
 	// Stringify the payload
@@ -142,14 +156,13 @@ console.log('sendMailgunEmail past validation');
 	var req = https.request(requestDetails, function(res){
 		// Grab the status of the sent response
 		var status = res.statusCode;
-console.log('sendMailgunEmail response:\n' + res.statusCode + '\n' + res.statusMessage );
 		if (status == 200 || status == 201) {
 			callback(false);
 		} else {
 		    callback('Status code returned was ' + status);
 		}
 	});
-console.log('sendMailgunEmail request initiated');
+
 	// Bind to the error event so it doesn't get thrown and kill the thread
 	req.on('error', function(e){
 		callback(e);
@@ -163,13 +176,15 @@ console.log('sendMailgunEmail request initiated');
 }
 
 // Send a payment via stripe
-helpers.sendStripePayment = function(chrgToken, chrgAmount, callback) {
+helpers.sendStripePayment = function(chrgToken, chrgAmount, emailAddr, orderString, callback) {
 	//validate the parameters
 	var token = jsutils.setString(chrgToken, null);
 	var orderAmt = (!chrgAmount || typeof(chrgAmount) != 'number') ? false : chrgAmount;
+	var orderEmail = jsutils.setString(emailAddr, null);
+	var order = jsutils.setString(orderString, null);
 
-	if (!token || !orderAmt) {
-		callback('Missing either Order Amount or Charge Token');
+	if (!token || !orderAmt  || !orderEmail) {
+		callback('Missing email Address or Order Amount or Charge Token');
 		return;
 	}
 	orderAmt = (orderAmt * 100).toFixed(0);
@@ -183,8 +198,13 @@ helpers.sendStripePayment = function(chrgToken, chrgAmount, callback) {
 
 	charge.then(
 		function(chargeResult){
-console.log('in the successful part of the charge then ' + chargeResult.amount);
-			// send the receipt email
+			// TODO send the receipt email
+			var receipt = 'Thank you for your order, it is on its way!\n' + order + '\n$' + chrgAmount;
+			helpers.sendMailgunEmail(orderEmail, receipt, function(err){
+				if (err) {
+					callback('Mailgun failed to send receipt');
+				}
+			});
 			callback(false);
 		}
 		,function(err){
@@ -193,5 +213,8 @@ console.log('in the successful part of the charge then ' + chargeResult.amount);
 	);	
 }
 
- // Export the module
+/***************************************
+	Exports
+		- helpers
+***************************************/
  module.exports = helpers;

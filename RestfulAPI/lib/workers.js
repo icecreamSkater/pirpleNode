@@ -2,20 +2,37 @@
  * Worker-related tasks
  */
 
- //Dependencies
+/***************************************
+	Dependencies
+***************************************/
+//modules within node
 var fs = require('fs');
 var path = require('path');
 var url = require('url');
 var http = require('http');
 var https = require('https');
-var _data = require('./data');
-var _logs = require('./logs');
 var util = require('util');
 var debug = util.debuglog('workers');
+
+//modules written for this project
 var helpers = require('./helpers');
 var jsutils = require('./utils');
+var _data = require('./data');
+var _logs = require('./logs');
 
-// Instantiate the worker object
+/***************************************
+	Workers Container
+		workers.gatherAllChecks - Gather all checks and send to validator
+		workers.validateCheckData - Check validator
+		workers.performCheck - perform checks, send the check data and pass on to the next step
+		workers.processCheckOutcome - Process the check outcome, trigger an alert if needed, include accomodation for checks never processed before
+		workers.alertUserToStatusChange - Alert User to change in their check status
+		workers.log - log to file function
+		workers.loop - Timer to execute the worker-process once per minute (TODO take out hardcoding)
+		workers.logRotationLoop - Timer to execute the log-rotation process once per day (TODO take out hardcoding)
+		workers.rotationLogs - 
+		workers.init - called by the file that is executed from the command line
+***************************************/
 var workers = {};
 
 // Gather all checks and send to validator
@@ -161,8 +178,8 @@ workers.processCheckOutcome = function(originalCheckData, checkOutcome) {
 	workers.log(originalCheckData,checkOutcome,state,alertWarranted,timeOfCheck);
 
 	// update the check data
-	var newCheckData = originalCheckData;
-	newCheckData.state = state;
+	var newCheckData         = originalCheckData;
+	newCheckData.state       = state;
 	newCheckData.lastChecked = timeOfCheck;
 
 	_data.update('checks', newCheckData.id, newCheckData, function(err){
@@ -286,5 +303,8 @@ workers.init = function(){
 	workers.logRotationLoop();
 };
 
-// Export the module
+/***************************************
+	Exports
+		- workers
+***************************************/
 module.exports = workers;
